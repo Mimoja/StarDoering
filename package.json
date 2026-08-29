@@ -1,0 +1,58 @@
+{
+  "name": "stardoring",
+  "productName": "StarDöring",
+  "version": "0.1.0",
+  "description": "Stardew Valley launcher & mod manager with multi-device mod sync",
+  "main": "./out/main/index.js",
+  "desktopName": "stardoering.desktop",
+  "license": "GPL-3.0-or-later",
+  "private": true,
+  "author": "Mimoja <mimoja@mimoja.de>",
+  "scripts": {
+    "dev": "node scripts/dev-app-name.cjs && electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "icons": "electron scripts/gen-icons.cjs",
+    "index": "node scripts/gen-download-index.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "dist": "electron-vite build && electron-builder",
+    "dist:mac": "electron-vite build && electron-builder --mac",
+    "dist:win": "electron-vite build && electron-builder --win",
+    "dist:linux": "electron-vite build && electron-builder --linux",
+    "dist:appimage": "electron-vite build && electron-builder --linux AppImage --x64",
+    "dist:appimage:arm64": "electron-vite build && electron-builder --linux AppImage --arm64",
+    "smoke:detect": "node scripts/esbuild-smoke.mjs scripts/smoke-detect.ts out/smoke-detect.cjs && node out/smoke-detect.cjs",
+    "smoke:git": "node scripts/esbuild-smoke.mjs scripts/smoke-git.ts out/smoke-git.cjs && node out/smoke-git.cjs",
+    "smoke:modlist": "node scripts/esbuild-smoke.mjs scripts/smoke-modlist.ts out/smoke-modlist.cjs && node out/smoke-modlist.cjs",
+    "smoke:serverconfig": "node scripts/esbuild-smoke.mjs scripts/smoke-serverconfig.ts out/smoke-serverconfig.cjs && node out/smoke-serverconfig.cjs",
+    "smoke:newconfig": "node scripts/esbuild-smoke.mjs scripts/smoke-newconfig.ts out/smoke-newconfig.cjs && node out/smoke-newconfig.cjs",
+    "smoke:bundled": "node scripts/esbuild-smoke.mjs scripts/smoke-bundled.ts out/smoke-bundled.cjs && node out/smoke-bundled.cjs",
+    "smoke:deeplink": "node scripts/esbuild-smoke.mjs scripts/smoke-deeplink.ts out/smoke-deeplink.cjs && node out/smoke-deeplink.cjs"
+  },
+  "dependencies": {
+    "adm-zip": "^0.6.0",
+    "json5": "^2.2.3"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.8",
+    "@types/node": "^26.4.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^44.0.0",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "electron-winstaller": "^5.4.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.6"
+  },
+  "allowScripts": {
+    "file:.pnpm/electron@44.0.0/node_modules/electron": true,
+    "file:../../esbuild@0.25.12/node_modules/esbuild": true,
+    "file:../esbuild@0.25.12/node_modules/esbuild": true,
+    "file:../../esbuild@0.28.2/node_modules/esbuild": true,
+    "file:../../electron-winstaller@5.4.0/node_modules/electron-winstaller": true
+  }
+}

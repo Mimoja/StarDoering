@@ -1,0 +1,10 @@
+node_modules/
+out/
+dist/
+*.log
+.DS_Store
+.signing/
+AuthKey_*.p8
+*.p8
+*.tsbuildinfo
+docs

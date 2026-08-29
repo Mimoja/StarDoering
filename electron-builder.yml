@@ -1,0 +1,58 @@
+appId: de.mimoja.stardoring
+productName: StarDöring
+directories:
+  output: dist
+  buildResources: resources
+files:
+  - out/**
+  - package.json
+asar: true
+# stardoering://add-profile?url=… links. This is what registers the scheme in the macOS bundle's
+# Info.plist and in the Linux .desktop file; on Windows the app registers it at runtime
+# (app.setAsDefaultProtocolClient) because NSIS does not write the scheme itself.
+protocols:
+  - name: StarDöring profile link
+    schemes:
+      - stardoering
+# The AppImage runtime shipped by default (0.0.0) links against libfuse2, which SteamOS does not
+# have. 1.0.3 is the static type-2 runtime: no FUSE dependency, so the AppImage runs on a Deck.
+toolsets:
+  appimage: '1.0.3'
+mac:
+  icon: resources/icon.icns
+  category: public.app-category.games
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip # plain archive next to the dmg
+      arch: [arm64, x64]
+  artifactName: StarDoering-${version}-${arch}.${ext}
+  # Unsigned until a "Developer ID Application" certificate exists. To sign + notarize again: drop `identity: null`,
+  # set notarize: true, hardenedRuntime: true, entitlements(.inherit) from resources/ – see COMPILE.md.
+  identity: null
+  notarize: false
+win:
+  icon: resources/icon.ico
+  target: [nsis, portable]
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  artifactName: StarDoering-${version}-${arch}-setup.${ext}
+portable:
+  artifactName: StarDoering-${version}-${arch}-portable.${ext}
+linux:
+  icon: resources/icons
+  target: [AppImage, deb]
+  category: Game
+  synopsis: Stardew Valley launcher & mod manager
+  description: Launches Stardew Valley with SMAPI and syncs the mod list with a git repository.
+  # ASCII everywhere the file name travels: AppImage file name, .desktop Exec, Steam shortcut Exe.
+  executableName: stardoering
+  artifactName: StarDoering-${version}-${arch}.${ext}
+  # Electron takes its app_id / WM_CLASS from package.json desktopName; this makes the installed
+  # .desktop file and StartupWMClass match it, so KDE links the running window to the launcher.
+  syncDesktopName: true
+appImage:
+  # Squashfs compression: zstd decompresses much faster than xz, which matters on a Deck.
+  compression: zstd
+publish: null

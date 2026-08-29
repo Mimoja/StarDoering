@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Master artwork for the StarDöring app icon: a 1024x1024 "face" with no
+       corner shaping. scripts/gen-icons.cjs clips it per platform (macOS
+       squircle, rounded square for Windows/Linux) and rasterises every size. -->
+  <defs>
+    <linearGradient id="sky" gradientUnits="userSpaceOnUse" x1="512" y1="0" x2="512" y2="1024">
+      <stop offset="0" stop-color="#FFC95E"/>
+      <stop offset="0.52" stop-color="#FF9E1B"/>
+      <stop offset="1" stop-color="#EE7100"/>
+    </linearGradient>
+    <radialGradient id="glow" gradientUnits="userSpaceOnUse" cx="330" cy="150" r="820">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.36"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.05"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="dusk" gradientUnits="userSpaceOnUse" x1="512" y1="640" x2="512" y2="1024">
+      <stop offset="0" stop-color="#B24A00" stop-opacity="0"/>
+      <stop offset="1" stop-color="#B24A00" stop-opacity="0.22"/>
+    </linearGradient>
+    <linearGradient id="roof" gradientUnits="userSpaceOnUse" x1="512" y1="158" x2="512" y2="562">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#FFF7EA"/>
+    </linearGradient>
+    <linearGradient id="wall" gradientUnits="userSpaceOnUse" x1="512" y1="250" x2="512" y2="842">
+      <stop offset="0" stop-color="#FFF1E0"/>
+      <stop offset="1" stop-color="#FFDCB2"/>
+    </linearGradient>
+    <filter id="cast" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#7A3400" flood-opacity="0.26"/>
+    </filter>
+    <filter id="soften" x="-25%" y="-25%" width="150%" height="150%">
+      <feGaussianBlur stdDeviation="15"/>
+    </filter>
+    <!-- Gable body up to the roofline, with rounded feet. -->
+    <clipPath id="body">
+      <path d="M256 816V358L512 158l256 200v458a26 26 0 0 1-26 26H282a26 26 0 0 1-26-26Z"/>
+    </clipPath>
+    <!-- The heart is knocked out of the farmhouse so the sky shows through it. -->
+    <mask id="knockout">
+      <rect width="1024" height="1024" fill="#fff"/>
+      <path fill="#000" transform="translate(512 620) scale(15.8) translate(-12 -12.18)"
+            d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+    </mask>
+    <!-- Four-point sparkle, drawn around its own origin at radius 1. -->
+    <path id="spark" d="M0-1C0.13-0.35 0.35-0.13 1 0 0.35 0.13 0.13 0.35 0 1-0.13 0.35-0.35 0.13-1 0-0.35-0.13-0.13-0.35 0-1Z"/>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#sky)"/>
+  <rect width="1024" height="1024" fill="url(#glow)"/>
+  <rect width="1024" height="1024" fill="url(#dusk)"/>
+
+  <g fill="#FFFFFF">
+    <use href="#spark" transform="translate(824 226) scale(46)" opacity="0.52"/>
+    <use href="#spark" transform="translate(902 140) scale(22)" opacity="0.36"/>
+    <use href="#spark" transform="translate(750 122) scale(14)" opacity="0.30"/>
+    <use href="#spark" transform="translate(160 292) scale(18)" opacity="0.26"/>
+  </g>
+
+  <g filter="url(#cast)">
+    <g mask="url(#knockout)">
+      <path fill="url(#wall)" d="M256 816V358L512 158l256 200v458a26 26 0 0 1-26 26H282a26 26 0 0 1-26-26Z"/>
+      <!-- What the eaves throw onto the wall below them. -->
+      <g clip-path="url(#body)">
+        <g filter="url(#soften)">
+          <path fill="#A34700" opacity="0.26" d="M112 562 512 250l400 312v78L512 328 112 640Z"/>
+        </g>
+      </g>
+      <!-- Gable roof: a chevron with square-cut, overhanging eaves. -->
+      <path fill="url(#roof)" d="M112 470 512 158l400 312v92L512 250 112 562Z"/>
+    </g>
+  </g>
+</svg>
