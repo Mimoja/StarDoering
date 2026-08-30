@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { logScope } from './activity'
+import type { GalaxyLibsState } from '../shared/types'
 import { exists, isFile } from './util/fs'
 
 const log = logScope('game')
@@ -106,4 +107,19 @@ export async function ensureGalaxyLibsLoadable(gameDir: string): Promise<{ patch
     })
   }
   return { patched, failed }
+}
+
+// 'patched' once we cleared the flag (the originals sit beside the libraries), 'unpatched' while one still carries it,
+// null when the libraries are not there or this is not Linux.
+export async function galaxyLibsState(gameDir: string): Promise<GalaxyLibsState> {
+  if (process.platform !== 'linux') return null
+  let patched = false
+  for (const name of GALAXY_LIBS) {
+    const file = path.join(gameDir, name)
+    if (!(await isFile(file))) continue
+    const header = await readStackHeader(file).catch(() => null)
+    if (header && header.flags & PF_X) return 'unpatched'
+    if (await exists(`${file}${BACKUP_SUFFIX}`)) patched = true
+  }
+  return patched ? 'patched' : null
 }
