@@ -1,6 +1,5 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, safeStorage, shell } from 'electron'
 import path from 'node:path'
-import { spawn } from 'node:child_process'
 import type { GithubInstallProgress, GithubInstallRequest, AppSettings, CatalogStatus, DeepLinkEvent, LaunchMode, LogEntry, ModConfigEdit, ModsChangeEvent, RemoteConfig, ServerConfigPullEvent, SmapiLog, SyncProgress, SyncState } from '../shared/types'
 import { GameService } from './game'
 import { ModlistService } from './modlist/service'
@@ -15,6 +14,7 @@ import { ModsWatcher } from './mods-watch'
 import { openTerminalAt } from './terminal'
 import { launchTarget, SteamShortcutService } from './steam-shortcut'
 import * as appimage from './appimage'
+import { relaunchInto } from './relaunch'
 import { ensureGalaxyLibsLoadable } from './galaxy-fix'
 import { smapiLogPath } from './paths'
 import { installModZips, scanMods, setModEnabled } from './mods'
@@ -411,22 +411,7 @@ function registerIpc(): void {
     if (!desktop.ok) log.warn(`Installed, but the desktop entry was not written: ${desktop.message}`)
     const exec = await appimage.execPath()
     log.info(`Restarting into ${exec}`)
-    /**
-     * Not app.relaunch(): it spawns the replacement as our own child, which loses both races that
-     * matter here. The new instance starts while we still hold the single-instance lock, so it quits
-     * on the spot; and when Steam started us, it kills our whole process group as we exit, taking the
-     * replacement with it. A detached shell gets its own session (so Steam cannot reap it) and waits
-     * a second (so the lock is free by the time Electron asks for it). The path goes in as $0, which
-     * needs no quoting.
-     */
-    setTimeout(() => {
-      try {
-        spawn('/bin/sh', ['-c', 'sleep 1; exec "$0"', exec], { detached: true, stdio: 'ignore' }).unref()
-      } catch (e) {
-        log.fail('Could not start the installed copy – start it from the application menu', e)
-      }
-      app.exit(0)
-    }, 800)
+    relaunchInto(exec) // without the AppImage's $APPDIR, or the installed AppRun would run the old mount again
     return { ...installed, message: `${installed.message}${desktop.ok ? ' Added to the application menu.' : ''} Restarting…` }
   })
   handle('appimage:installDesktop', () => appimage.installDesktopFiles())

@@ -49,21 +49,19 @@ export async function execPath(): Promise<string> {
   return path.join(await installPath(), 'AppRun')
 }
 
-/**
- * The AppImage file we are running from, or null. The runtime exports $APPIMAGE – the file itself
- * rather than the /tmp mount – for exactly this purpose.
- *
- * The catch: electron-builder's AppRun sets `APPIMAGE="$APPDIR/AppRun"` when there is no AppImage,
- * so an unpacked install claims to be one. Taking that at face value made "Install to home" delete
- * the tree it was running from and then hang. A real AppImage is a file called something else.
- */
+function inside(child: string, parent: string): boolean {
+  return path.resolve(child).startsWith(path.resolve(parent) + path.sep)
+}
+
+// The AppImage file we are running from ($APPIMAGE – the file, not the /tmp mount), or null. Both variables are
+// inherited by anything an AppImage starts, so they only count while this executable actually lives in $APPDIR.
 export function runningAppImage(): string | null {
   const p = process.env['APPIMAGE']
-  if (!p || !path.isAbsolute(p)) return null
-  if (path.basename(p) === 'AppRun') return null
   const dir = process.env['APPDIR']
-  if (dir && path.resolve(p).startsWith(path.resolve(dir) + path.sep)) return null
-  return p
+  if (!p || !dir || !path.isAbsolute(p) || !path.isAbsolute(dir)) return null
+  // electron-builder's AppRun sets APPIMAGE="$APPDIR/AppRun" for an unpacked tree, which is no AppImage.
+  if (path.basename(p) === 'AppRun' || inside(p, dir)) return null
+  return inside(process.execPath, dir) ? p : null
 }
 
 /**
@@ -78,14 +76,9 @@ export function steamExecPath(): string | null {
   return runningAppImage()
 }
 
-/**
- * The folder holding our own .desktop file and icons: the AppImage's mounted AppDir, or the unpacked
- * install we are running from. $APPDIR is only set by the AppImage runtime, so for an unpacked tree
- * we recognise it by the AppRun sitting next to the executable.
- */
-function appDir(): string | null {
-  const env = process.env['APPDIR']
-  if (env && path.isAbsolute(env)) return env
+// The AppDir we run from – the AppImage's mount or an unpacked tree – recognised by the AppRun beside the
+// executable. Never $APPDIR alone: inherited from an AppImage that started us, it names a dead mount.
+export function runningAppDir(): string | null {
   const beside = path.dirname(process.execPath)
   return existsSync(path.join(beside, 'AppRun')) ? beside : null
 }
@@ -104,7 +97,7 @@ export async function status(): Promise<AppImageStatus> {
   const source = runningAppImage()
   const target = await installPath()
   const desktopFile = desktopFilePath()
-  const dir = appDir()
+  const dir = runningAppDir()
   return {
     running: source != null,
     source,
@@ -269,7 +262,7 @@ export async function installDesktopFiles(): Promise<{ ok: boolean; message: str
   if (process.platform !== 'linux') {
     return { ok: false, message: 'Desktop entries are a Linux thing.', path: file }
   }
-  const dir = appDir()
+  const dir = runningAppDir()
   if (!dir) {
     return { ok: false, message: 'StarDöring is not running from an AppImage or an unpacked install, so there is no desktop entry to write.', path: file }
   }
