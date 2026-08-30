@@ -379,6 +379,8 @@ export interface ServerConfigView {
   draft: boolean
   // Local selection/files differ from the server config – a push would change the repository.
   unpushed: boolean
+  // What that push would do, one line per change, worded like the commit it would create (empty = in step).
+  changes: string[]
   checkedAt: number
 }
 

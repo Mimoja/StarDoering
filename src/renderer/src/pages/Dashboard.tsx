@@ -7,8 +7,9 @@ import LogViewer from '../components/LogViewer'
 import VersionHistory from '../components/VersionHistory'
 import { Button, ErrorBox, List, Modal, Row } from '../components/ui'
 import { api, errorText, gitInstallHint, useAsync, useBusy } from '../lib/hooks'
+import { changeClass, stripChangeIcon } from '../lib/changes'
 
-export default function Dashboard({ notify, profile, profiles, reloadProfiles, selectProfile, sync }: PageProps) {
+export default function Dashboard({ notify, profile, profiles, reloadProfiles, selectProfile, sync, config }: PageProps) {
   const force = useRef(false)
   const info = useAsync(() => api.game.getInfo(force.current))
   const mods = useAsync(() => api.mods.list())
@@ -182,6 +183,20 @@ export default function Dashboard({ notify, profile, profiles, reloadProfiles, s
                   ))}
               </span>
             </Row>
+
+            {profile && config.data && (config.data.changes.length > 0 || config.data.aheadOfServer) && (
+              <Row>
+                <span className="line">
+                  “{profile.name}” has <b>unpushed changes</b> – Push on the Mods page publishes:
+                </span>
+                {config.data.changes.map((l) => (
+                  <span key={l} className={changeClass(l)}>
+                    {stripChangeIcon(l)}
+                  </span>
+                ))}
+                {config.data.changes.length === 0 && <span className="sub">Local commits not on the server yet.</span>}
+              </Row>
+            )}
 
             {g?.galaxyLibs && (
               <Row>

@@ -559,6 +559,7 @@ export class ServerConfigService {
       rows: [],
       draft: false,
       unpushed: false,
+      changes: [],
       checkedAt: Date.now()
     }
   }
@@ -750,7 +751,9 @@ export class ServerConfigService {
       !built.hasModlist ||
       folderDiffers ||
       built.rows.some((r) => (r.installed && r.configEnabled != null && r.localEnabled !== r.configEnabled) || (r.installed && r.inConfig && !r.inRepo))
+    const changes = unpushed ? await this.pendingChanges(group, snap, text).catch(() => [] as string[]) : []
     return {
+      changes,
       group: this.deps.groups.toPublic(await this.deps.groups.get(group.id)),
       gitAvailable: true,
       stale,
@@ -873,6 +876,27 @@ export class ServerConfigService {
       this.failState(e)
       throw e
     }
+  }
+
+  // What a push would do right now, worded exactly like the commit it would create (kept in step with pushWith).
+  private async pendingChanges(group: StoredGroup, snap: RemoteSnapshot, text: string | null): Promise<string[]> {
+    const modlistText = await this.deps.modlist.generate(text, { name: group.name, onlyListed: true })
+    const finalIds = new Set((parseModlist(modlistText).modlist?.mods ?? []).map((e) => e.id.toLowerCase()))
+    const changes = this.listChanges(snap.text, modlistText)
+    const info = await this.deps.game.getInfo()
+    const installed = info.modsDir ? await scanMods(info.modsDir) : []
+    const keep = new Set<string>()
+    for (const m of installed) {
+      if (m.isBundled || !m.uniqueId || !finalIds.has(m.uniqueId.toLowerCase())) continue
+      const folder = path.basename(normalizeModFolder(m.folder))
+      keep.add(folder.toLowerCase())
+      const d = await this.diffFolders(m.folderPath, path.join(this.cloneDir(group), MODS_DIR, folder))
+      if (!d.same) changes.push({ kind: d.missing ? 'files-added' : d.configChanged ? 'config' : 'files', name: m.name, detail: m.version })
+    }
+    for (const r of snap.repoMods.values()) {
+      if (!finalIds.has(r.uniqueId.toLowerCase()) && !keep.has(r.folder.toLowerCase())) changes.push({ kind: 'files-removed', name: r.name })
+    }
+    return this.describe(changes).details
   }
 
   // Push
