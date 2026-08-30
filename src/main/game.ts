@@ -117,7 +117,10 @@ export class GameService extends EventEmitter {
   }
 
   async getInfo(refresh = false): Promise<GameInfo> {
-    if (!this.info || refresh) this.info = await this.detect()
+    if (!this.info || refresh) {
+      this.info = await this.detect()
+      this.emit('info', this.info)
+    }
     this.info.running = this.child != null || this.steamRunning
     return this.info
   }

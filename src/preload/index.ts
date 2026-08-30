@@ -23,7 +23,8 @@ const api: Api = {
     setEnabled: (folder, enabled) => invoke('mods:setEnabled', folder, enabled),
     open: (folder) => invoke('mods:open', folder),
     remove: (folder) => invoke('mods:remove', folder),
-    install: (zipPaths) => invoke('mods:install', zipPaths)
+    install: (zipPaths) => invoke('mods:install', zipPaths),
+    onChange: (cb) => on('mods:change', cb)
   },
   saves: {
     list: () => invoke('saves:list'),
