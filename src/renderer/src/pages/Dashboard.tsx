@@ -57,6 +57,7 @@ export default function Dashboard({ notify, profile, profiles, reloadProfiles, s
   // Unknown (offline, rate-limited) leaves the button as a plain "Update" – never claim up to date on a guess.
   const smapiUpToDate = Boolean(g?.smapi.version && latestSmapi.data && !isNewerVersion(latestSmapi.data, g.smapi.version))
   const allMods = mods.data ?? null
+  const downloaded = (config.data?.rows ?? []).filter((r) => r.state === 'extra' && !r.bundled).length
   const u = update.data
 
   const openDir = (which: 'game' | 'mods' | 'saves' | 'logs') => api.game.openDir(which).catch((e) => notify(errorText(e)))
@@ -134,12 +135,11 @@ export default function Dashboard({ notify, profile, profiles, reloadProfiles, s
                   )
                 ) : g.found ? (
                   <>
-                    Found <b>Stardew Valley {g.gameVersion ?? ''}</b> {s?.gameDirOverride ? 'in the folder you picked' : <>installed via <b>{g.source}</b></>} in{' '}
-                    <span className="mono">{g.gameDir}</span>
+                    Stardew Valley: found <b>{g.gameVersion ?? '?'}</b> via <b>{g.source}</b> in <span className="mono">{g.gameDir}</span>
                   </>
                 ) : (
                   <>
-                    Could not find <b>Stardew Valley</b> – use “Set folder…” to point at it.
+                    Stardew Valley: <b>not found</b> – use “Set folder…” to point at it.
                   </>
                 )}
               </span>
@@ -169,16 +169,11 @@ export default function Dashboard({ notify, profile, profiles, reloadProfiles, s
                 {g &&
                   (g.smapi.installed ? (
                     <>
-                      <b>SMAPI {g.smapi.version ?? ''}</b> is installed
-                      {g.lastRun ? (
-                        <> and last ran {g.lastRun.at ?? 'at an unknown time'} with game {g.lastRun.gameVersion ?? '?'}.</>
-                      ) : (
-                        <>, but has not written a log yet.</>
-                      )}
+                      SMAPI: installed (<b>{g.smapi.version ?? '?'}</b>){!smapiUpToDate && latestSmapi.data ? ' [outdated]' : ''}
                     </>
                   ) : (
                     <>
-                      <b>SMAPI</b> is not installed – it is needed to play with mods.
+                      SMAPI: <b>not installed</b> – needed to play with mods.
                     </>
                   ))}
               </span>
@@ -202,14 +197,9 @@ export default function Dashboard({ notify, profile, profiles, reloadProfiles, s
               <Row>
                 <span className="line">
                   {g.galaxyLibs === 'patched' ? (
-                    <>
-                      The game's <b>Galaxy libraries are patched</b> (executable-stack flag cleared) so co-op can reach the online services – the originals sit beside them as{' '}
-                      <span className="mono">*.execstack-backup</span>.
-                    </>
+                    <>Galaxy Libraries: <b>patched</b> (executable-stack flag cleared)</>
                   ) : (
-                    <>
-                      The game's <b>Galaxy libraries are not patched</b> – glibc 2.41+ refuses to load them, so co-op cannot reach the online services. The activity log says why the fix did not apply.
-                    </>
+                    <>Galaxy Libraries: <b>not patched</b> – glibc 2.41+ refuses to load them; the activity log says why</>
                   )}
                 </span>
               </Row>
@@ -227,10 +217,11 @@ export default function Dashboard({ notify, profile, profiles, reloadProfiles, s
                   mods.error
                 ) : allMods ? (
                   <>
+                    Mods:{' '}
                     <b>
                       {allMods.filter((m) => m.enabled).length} of {allMods.length}
                     </b>{' '}
-                    installed mods are enabled.
+                    enabled{downloaded > 0 ? ` (${downloaded} downloaded)` : ''}
                   </>
                 ) : (
                   'Counting mods…'
@@ -343,11 +334,11 @@ export default function Dashboard({ notify, profile, profiles, reloadProfiles, s
                 {gitInfo.data ? (
                   gitInfo.data.available ? (
                     <>
-                      Found <b>git</b> in version <b>{gitInfo.data.version}</b>
+                      git: <b>found</b> ({gitInfo.data.version})
                     </>
                   ) : (
                     <span className="hint" title={gitInstallHint()}>
-                      <b>git</b> is missing
+                      git: <b>missing</b>
                     </span>
                   )
                 ) : gitInfo.error ? (
