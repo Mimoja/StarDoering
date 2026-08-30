@@ -183,6 +183,23 @@ export default function Dashboard({ notify, profile, profiles, reloadProfiles, s
               </span>
             </Row>
 
+            {g?.galaxyLibs && (
+              <Row>
+                <span className="line">
+                  {g.galaxyLibs === 'patched' ? (
+                    <>
+                      The game's <b>Galaxy libraries are patched</b> (executable-stack flag cleared) so co-op can reach the online services – the originals sit beside them as{' '}
+                      <span className="mono">*.execstack-backup</span>.
+                    </>
+                  ) : (
+                    <>
+                      The game's <b>Galaxy libraries are not patched</b> – glibc 2.41+ refuses to load them, so co-op cannot reach the online services. The activity log says why the fix did not apply.
+                    </>
+                  )}
+                </span>
+              </Row>
+            )}
+
             <Row
               actions={
                 <Button variant="ghost" disabled={!g?.modsDir} onClick={() => void openDir('mods')}>

@@ -16,7 +16,6 @@ import { launchTarget, SteamShortcutService } from './steam-shortcut'
 import * as appimage from './appimage'
 import { relaunchInto } from './relaunch'
 import { UpdateService } from './updater'
-import { ensureGalaxyLibsLoadable } from './galaxy-fix'
 import { smapiLogPath } from './paths'
 import { installModZips, scanMods, setModEnabled } from './mods'
 import { createModConfig, readModConfigDoc, resetModConfig, saveModConfigText, saveModConfigValues } from './mod-config'
@@ -500,12 +499,6 @@ if (!app.requestSingleInstanceLock()) {
       .then((entries) => log.debug(`Mod library ready – ${entries.length} version${entries.length === 1 ? '' : 's'}`))
       .catch((e) => log.warn(`Could not read the mod library: ${errorMessage(e)}`))
 
-    // glibc 2.41 refuses Stardew's Galaxy libraries, which strands co-op on "Connecting to online
-    // services". Checked on every start: a game update restores the originals, and this puts them back.
-    void game
-      .getInfo()
-      .then((info) => (info.gameDir ? ensureGalaxyLibsLoadable(info.gameDir) : undefined))
-      .catch((e) => log.warn(`Could not check the Galaxy libraries: ${errorMessage(e)}`))
     // Nexus nxm:// links are not handled – drop any registration that is still around.
     try {
       if (app.isDefaultProtocolClient('nxm')) app.removeAsDefaultProtocolClient('nxm')

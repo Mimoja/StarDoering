@@ -22,6 +22,9 @@ export interface SmapiInfo {
   launcherPath: string | null
 }
 
+// Linux: whether the game's Galaxy libraries had their executable-stack flag cleared (glibc 2.41+ refuses them otherwise).
+export type GalaxyLibsState = 'patched' | 'unpatched' | null
+
 export interface GameInfo {
   platform: Platform
   found: boolean
@@ -38,6 +41,7 @@ export interface GameInfo {
   smapiLogPath: string | null
   // Parsed from the last SMAPI log run, if present.
   lastRun: { smapiVersion: string | null; gameVersion: string | null; os: string | null; at: string | null } | null
+  galaxyLibs: GalaxyLibsState
   running: boolean
 }
 

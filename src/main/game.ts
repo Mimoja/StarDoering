@@ -11,6 +11,7 @@ import { currentPlatform, defaultSavesDir, findGameCandidates, resolveGameDir, s
 import { isNewerVersion } from '../shared/version'
 import { fetchLatestSmapiVersion } from './modlist/resolve'
 import { logScope } from './activity'
+import { ensureGalaxyLibsLoadable, galaxyLibsState } from './galaxy-fix'
 import { ensureDir, errorMessage, exists, isDir, isFile, readText, rmrf } from './util/fs'
 
 const execFileAsync = promisify(execFile)
@@ -155,6 +156,8 @@ export class GameService extends EventEmitter {
     }
 
     const smapi: SmapiInfo = gameDir ? await readSmapiInfo(gameDir) : { installed: false, version: null, launcherPath: null }
+    // A game update or Steam's "verify integrity" restores the original libraries; every detection puts the fix back.
+    if (gameDir) await ensureGalaxyLibsLoadable(gameDir)
     const lastRun = await parseSmapiLog(logPath)
     const detected = `${gameDir ?? 'none'}|${source}|${smapi.version ?? ''}`
     if (detected === this.loggedDetection) {
@@ -179,6 +182,7 @@ export class GameService extends EventEmitter {
       modsDir: gameDir ? path.join(gameDir, 'Mods') : null,
       smapiLogPath: (await exists(logPath)) ? logPath : null,
       lastRun,
+      galaxyLibs: gameDir ? await galaxyLibsState(gameDir) : null,
       running: this.child != null || this.steamRunning
     }
   }
