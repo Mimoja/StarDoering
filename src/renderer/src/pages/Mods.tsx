@@ -192,6 +192,26 @@ function ProfileMods({ notify, profile, reloadProfiles, config, cog }: Pick<Page
   // anybody made in this config and they cannot be added to it.
   const inConfig = (v?.rows ?? []).filter((r) => r.inConfig || r.bundled)
   const extra = (v?.rows ?? []).filter((r) => r.state === 'extra' && !r.bundled)
+  // Library mods without a row here – newest stored version each.
+  const libraryOnly = useMemo(() => {
+    const seen = new Set((v?.rows ?? []).map((r) => r.id.toLowerCase()))
+    const best = new Map<string, LibraryEntry>()
+    for (const e of lib.data ?? []) {
+      const key = e.id.toLowerCase()
+      if (seen.has(key)) continue
+      const cur = best.get(key)
+      if (!cur || e.addedAt > cur.addedAt) best.set(key, e)
+    }
+    return [...best.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+  }, [v, lib.data])
+
+  const addFromLibrary = (e: LibraryEntry) =>
+    run(`add-${e.id}`, async () => {
+      await api.library.install(e.id, e.version)
+      await api.serverConfig.addInstalled([e.id])
+      notify(`“${e.name}” ${e.version} installed and added to the server config – push to publish it.`)
+      await Promise.all([lib.reload(), view.reload()])
+    })
 
   return (
     <>
@@ -304,11 +324,24 @@ function ProfileMods({ notify, profile, reloadProfiles, config, cog }: Pick<Page
 
       {/* Mods that happen to be installed here are not part of this server config – they are not selected,
           not counted, and a push leaves them alone. Folded away so the config itself is what the page shows. */}
-      {extra.length > 0 && (
-        <Collapsible title={`Downloaded (${extra.length})`}>
+      {extra.length + libraryOnly.length > 0 && (
+        <Collapsible title={`Downloaded (${extra.length + libraryOnly.length})`}>
           <List>
             {extra.map((r) => (
               <ModRow key={r.id} row={r} busy={busy} configured={false} versions={versionsOf(r).length} onVersions={setVersionsFor} onToggle={setEnabled} onInstall={installFromPage} onAdd={addToConfig} onRemove={remove} onDelete={deleteFiles} onCheckGithub={checkGithub} github={githubChecks[r.id] ?? null} onReload={() => view.reload()} notify={notify} />
+            ))}
+            {libraryOnly.map((e) => (
+              <Row
+                key={e.id}
+                label={<span className="name">{e.name}</span>}
+                actions={
+                  <Button busy={busy === `add-${e.id}`} title={`Install ${e.name} ${e.version} from the library and add it to the config`} onClick={() => void addFromLibrary(e)}>
+                    Add to config
+                  </Button>
+                }
+              >
+                <span className="sub">{e.version} · in the library, not installed here</span>
+              </Row>
             ))}
           </List>
         </Collapsible>
