@@ -90,6 +90,11 @@ function ensureAskpassScript(): string {
   return askpassScript
 }
 
+// "~/.ssh/key" typed by hand: a shell would expand it, the quoted -i argument does not.
+function expandHome(p: string): string {
+  return p.startsWith('~/') ? path.join(os.homedir(), p.slice(2)) : p
+}
+
 // Environment that makes git non-interactive and applies the selected SSH key / passphrase / HTTPS token.
 function gitEnv(auth: GitAuth = {}): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env, GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C', LANG: 'C' }
@@ -98,7 +103,7 @@ function gitEnv(auth: GitAuth = {}): NodeJS.ProcessEnv {
   const usePassphrase = Boolean(auth.sshKeyPath && auth.sshPassphrase)
   const sshOpts = ['-o StrictHostKeyChecking=accept-new']
   if (!usePassphrase) sshOpts.unshift('-o BatchMode=yes')
-  if (auth.sshKeyPath) sshOpts.unshift(`-i ${quoteForSh(auth.sshKeyPath)}`, '-o IdentitiesOnly=yes')
+  if (auth.sshKeyPath) sshOpts.unshift(`-i ${quoteForSh(expandHome(auth.sshKeyPath))}`, '-o IdentitiesOnly=yes')
   env['GIT_SSH_COMMAND'] = `ssh ${sshOpts.join(' ')}`
   if (usePassphrase) {
     env['SSH_ASKPASS'] = ensureAskpassScript()

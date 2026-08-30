@@ -14,6 +14,8 @@ export function ProfileManager({ profile, profiles, notify, reloadProfiles, sele
   const branchInfo = useAsync<BranchInfo | null>(() => (profile ? api.sync.branches(profile.id) : Promise.resolve(null)), [profile?.id])
   const { busy, run } = useBusy(notify)
   const [adding, setAdding] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const editingGroup = profiles.find((g) => g.id === editingId) ?? null
   // Profile whose "this branch is new" chooser was dismissed – not reopened for that one.
   const [branchDismissed, setBranchDismissed] = useState<string | null>(null)
 
@@ -42,6 +44,7 @@ export function ProfileManager({ profile, profiles, notify, reloadProfiles, sele
 
   const onSaved = async (group: SyncGroup, created: boolean): Promise<void> => {
     setAdding(false)
+    setEditingId(null)
     if (created) await api.serverConfig.setActive(group.id)
     await reloadProfiles()
     notify(created ? 'Profile added' : 'Profile saved')
@@ -80,6 +83,9 @@ export function ProfileManager({ profile, profiles, notify, reloadProfiles, sele
               }
               actions={
                 <>
+                  <Button variant="ghost" disabled={editingId === g.id} title="Change the repository URL, branch or SSH key" onClick={() => setEditingId(g.id)}>
+                    Edit
+                  </Button>
                   <Button
                     variant="ghost"
                     busy={busy === `open-${g.id}`}
@@ -102,6 +108,7 @@ export function ProfileManager({ profile, profiles, notify, reloadProfiles, sele
             </Row>
           )
         })}
+        {editingGroup && <RepoEditor key={editingGroup.id} group={editingGroup} keys={keys.data ?? []} notify={notify} onSaved={onSaved} onCancel={() => setEditingId(null)} />}
         {adding && <RepoEditor key="new" group={null} keys={keys.data ?? []} notify={notify} onSaved={onSaved} onCancel={() => setAdding(false)} />}
       </List>
 
@@ -280,17 +287,14 @@ function TextRow({ label, value, onSave, placeholder, hint }: { label: string; v
 // Inline rows for adding / editing a repository: URL + Test + Add/Save, with the rest under an "Advanced" toggle.
 export function RepoEditor({ group, keys, notify, onSaved, onCancel }: { group: SyncGroup | null; keys: SshKeyInfo[]; notify: (m: string) => void; onSaved: (g: SyncGroup, created: boolean) => Promise<void>; onCancel: () => void }) {
   const [remote, setRemote] = useState<GitRemoteConfig>(group ? { ...emptyRemote(), ...group.remote, sshPassphrase: '', token: '' } : emptyRemote())
-  const [advanced, setAdvanced] = useState(false)
+  const [advanced, setAdvanced] = useState(Boolean(group))
   const { busy, run } = useBusy(notify)
   const isHttps = /^https?:/i.test(remote.url.trim())
   const patch = (p: Partial<GitRemoteConfig>) => setRemote({ ...remote, ...p })
 
   const payload = (): GitRemoteConfig => {
-    const r: GitRemoteConfig = { ...remote, url: remote.url.trim(), branch: remote.branch.trim() || 'main' }
-    if (!r.sshKeyPath) {
-      r.sshKeyPath = null
-      r.sshPassphrase = ''
-    }
+    const r: GitRemoteConfig = { ...remote, url: remote.url.trim(), branch: remote.branch.trim() || 'main', sshKeyPath: remote.sshKeyPath?.trim() || null }
+    if (!r.sshKeyPath) r.sshPassphrase = ''
     if (!isHttps) r.token = ''
     if (!group) {
       // New repository: an empty secret means "none" (for edits it means "keep the stored one").
@@ -356,15 +360,14 @@ export function RepoEditor({ group, keys, notify, onSaved, onCancel }: { group: 
               </Button>
             }
           >
-            <select className="grow" value={remote.sshKeyPath ?? ''} onChange={(e) => patch({ sshKeyPath: e.target.value || null })}>
-              <option value="">System default (ssh-agent / ~/.ssh/config)</option>
+            <input className="grow mono" list="ssh-keys" value={remote.sshKeyPath ?? ''} onChange={(e) => patch({ sshKeyPath: e.target.value || null })} placeholder="system default (ssh-agent / ~/.ssh/config) – or a private key path" spellCheck={false} autoComplete="off" />
+            <datalist id="ssh-keys">
               {keys.map((k) => (
                 <option key={k.path} value={k.path}>
                   {k.name}
                 </option>
               ))}
-              {remote.sshKeyPath && !keys.some((k) => k.path === remote.sshKeyPath) && <option value={remote.sshKeyPath}>{remote.sshKeyPath}</option>}
-            </select>
+            </datalist>
           </Row>
           {remote.sshKeyPath && (
             <Row label="Key passphrase">
