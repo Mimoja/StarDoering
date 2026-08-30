@@ -306,7 +306,12 @@ function registerIpc(): void {
   // sync
   handle('sync:listGroups', async () => (await groups.list()).map((g) => groups.toPublic(g)))
   handle('sync:createGroup', (input: { name?: string; remote: RemoteConfig }) => serverConfig.addGroup(input))
-  handle('sync:updateGroup', async (id: string, patch: { name?: string; remote?: Partial<RemoteConfig> }) => groups.toPublic(await groups.update(id, patch)))
+  handle('sync:updateGroup', async (id: string, patch: { name?: string; remote?: Partial<RemoteConfig> }) => {
+    const group = groups.toPublic(await groups.update(id, patch))
+    // A new URL, branch or key on the active profile is used right away, not at the next start.
+    if (patch.remote && (await settingsStore.get()).activeGroupId === id) void serverConfig.pullQuietly({ trigger: 'switch' })
+    return group
+  })
   handle('sync:removeGroup', (id: string) => groups.remove(id))
   handle('sync:gitInfo', () => findGit(true))
   handle('sync:branches', async (groupId: string) => {
