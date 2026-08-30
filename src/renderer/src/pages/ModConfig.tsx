@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ModInfo, ServerConfigRow } from '@shared/types'
 import type { PageProps } from '../App'
 import { Badge, Button, Empty, ErrorBox, Section } from '../components/ui'
@@ -13,6 +13,17 @@ export default function ModConfig({ notify, profile, config }: PageProps) {
   const [filter, setFilter] = useState('')
   // Folders whose settings are unfolded – several can be open at once.
   const [open, setOpen] = useState<string[]>([])
+  // Bumped when the game (or a hand edit) rewrote a folder's config.json: remounts that entry with the values on disk.
+  const [touched, setTouched] = useState<Record<string, number>>({})
+  useEffect(
+    () =>
+      api.mods.onChange((e) => {
+        setTouched((t) => ({ ...t, ...Object.fromEntries(e.configs.map((f) => [f, (t[f] ?? 0) + 1])) }))
+        void mods.reload()
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  )
 
   // A saved config.json is a change to the profile's repository, so the server config view has to be
   // re-read as well: it carries the "config ↑" badges and whether a push has anything to publish.
@@ -138,7 +149,7 @@ export default function ModConfig({ notify, profile, config }: PageProps) {
           <div className="list">
             {visible.map((m) => (
               <ConfigEntry
-                key={m.folder}
+                key={`${m.folder}#${touched[m.folder] ?? 0}`}
                 mod={m}
                 row={rowFor(m)}
                 profiled={Boolean(profile)}

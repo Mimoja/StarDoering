@@ -146,6 +146,21 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sync?.status])
 
+  // The game saving a config.json (GMCM), a mod folder appearing or vanishing, the game exiting: re-read the local
+  // clone against the Mods folder – no fetch – so "config ↑" and the unpushed state follow what is on disk.
+  useEffect(() => {
+    const reread = (): void => {
+      if (activeId) void api.serverConfig.view({ fetch: false }).then((v) => config.setData(v)).catch(() => undefined)
+    }
+    const offMods = api.mods.onChange(reread)
+    const offExit = api.game.onExit(reread)
+    return () => {
+      offMods()
+      offExit()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId])
+
   useEffect(() => {
     void check()
     // eslint-disable-next-line react-hooks/exhaustive-deps
