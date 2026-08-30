@@ -20,10 +20,13 @@ export default function Dashboard({ notify, profile, profiles, reloadProfiles, s
   // AppImage only: offer to copy itself to ~/.bin, so its path stops depending on where it was downloaded.
   const appimage = useAsync(() => api.appimage.status())
   const settings = useAsync(() => api.settings.get())
+  // StarDöring's own update – installed at start on its own; the row only shows what is happening.
+  const update = useAsync(() => api.update.state())
   const { busy, run } = useBusy(notify)
   const [logsOpen, setLogsOpen] = useState(false)
 
   useEffect(() => api.game.onExit(() => void info.reload()), [])
+  useEffect(() => api.update.onState((s) => update.setData(s)), [])
 
   // Switching profiles replaces the whole Mods folder, so every count on this page is stale the
   // moment the active profile changes. Re-read instead of waiting for the window to regain focus.
@@ -53,6 +56,7 @@ export default function Dashboard({ notify, profile, profiles, reloadProfiles, s
   // Unknown (offline, rate-limited) leaves the button as a plain "Update" – never claim up to date on a guess.
   const smapiUpToDate = Boolean(g?.smapi.version && latestSmapi.data && !isNewerVersion(latestSmapi.data, g.smapi.version))
   const allMods = mods.data ?? null
+  const u = update.data
 
   const openDir = (which: 'game' | 'mods' | 'saves' | 'logs') => api.game.openDir(which).catch((e) => notify(errorText(e)))
 
@@ -201,6 +205,30 @@ export default function Dashboard({ notify, profile, profiles, reloadProfiles, s
                 )}
               </span>
             </Row>
+
+            {u && u.phase !== 'idle' && u.phase !== 'current' && (
+              <Row
+                actions={
+                  (u.phase === 'available' || u.phase === 'error') && (
+                    <Button variant="ghost" onClick={() => void api.app.openExternal(u.releaseUrl).catch((e) => notify(errorText(e)))}>
+                      Release page
+                    </Button>
+                  )
+                }
+              >
+                <span className="line">
+                  {u.phase === 'available' ? (
+                    <>
+                      StarDöring <b>{u.latestVersion}</b> is available – this is {u.currentVersion}.{u.message ? ` ${u.message}` : ''}
+                    </>
+                  ) : u.phase === 'error' ? (
+                    <>Updating to StarDöring {u.latestVersion} failed: {u.message}</>
+                  ) : (
+                    u.message
+                  )}
+                </span>
+              </Row>
+            )}
 
             {appimage.data && (appimage.data.running || appimage.data.current) && (!appimage.data.current || !appimage.data.desktopInstalled) && (
               <Row

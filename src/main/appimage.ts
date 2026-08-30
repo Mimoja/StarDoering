@@ -137,12 +137,28 @@ async function removeInstall(dir: string): Promise<void> {
   await fs.rm(doomed, RM).catch((e) => log.warn(`Left ${doomed} behind – it can be deleted by hand`, { detail: errorMessage(e) }))
 }
 
-/** Tidy up trees a previous update could not finish deleting. */
-async function sweepLeftovers(parent: string): Promise<void> {
+// Remove the `<dir>.deleting-<pid>` trees an earlier install or update renamed aside – never the one we run from.
+export async function sweepDoomed(dir: string): Promise<void> {
+  const parent = path.dirname(dir)
+  const prefix = `${path.basename(dir)}.deleting-`
   for (const name of await fs.readdir(parent).catch(() => [] as string[])) {
-    if (!name.startsWith(`${DIR_NAME}.deleting-`)) continue
-    await fs.rm(path.join(parent, name), RM).catch(() => undefined)
+    if (!name.startsWith(prefix)) continue
+    const doomed = path.join(parent, name)
+    if (inside(process.execPath, doomed)) continue
+    await fs.rm(doomed, RM).catch(() => undefined)
   }
+}
+
+// Leftovers of the unpacked install and of its unpack scratch folder.
+export async function sweepLeftovers(): Promise<void> {
+  const target = await installPath()
+  await sweepDoomed(target)
+  await sweepDoomed(scratchFor(target))
+}
+
+// --appimage-extract always writes ./squashfs-root, so it runs in a scratch folder beside the target.
+function scratchFor(target: string): string {
+  return path.join(path.dirname(target), `.${path.basename(target)}-unpack`)
 }
 
 export async function install(): Promise<{ ok: boolean; message: string; path: string }> {
@@ -168,30 +184,15 @@ export async function install(): Promise<{ ok: boolean; message: string; path: s
   const since = (): string => `${Date.now() - started} ms`
   log.info(`Installing into ${target}`, { detail: `from ${source} (${(await fs.stat(source)).size} bytes)` })
 
-  // --appimage-extract always writes ./squashfs-root, so unpack in a scratch folder and move the
-  // result into place. The old install is deleted first: swapping it aside and cleaning up afterwards
-  // was two more chances to fail on a tree this size, and re-running from the AppImage is cheap.
-  const scratch = path.join(parent, `.${DIR_NAME}-unpack`)
+  // The old install is deleted first: swapping it aside and cleaning up afterwards was two more chances
+  // to fail on a tree this size, and re-running from the AppImage is cheap.
+  const scratch = scratchFor(target)
   log.debug(`Clearing ${scratch} and the previous install at ${target}`)
-  await sweepLeftovers(parent)
+  await sweepLeftovers()
   await removeInstall(scratch)
   await removeInstall(target)
-  await ensureDir(scratch)
   try {
-    // ELECTRON_RUN_AS_NODE must not reach the child: the AppImage would start as Node and sit there
-    // instead of unpacking, and the install would hang until the timeout.
-    const env = { ...process.env }
-    delete env['ELECTRON_RUN_AS_NODE']
-    log.info('Unpacking the AppImage – this takes a while', { detail: `${source} --appimage-extract (cwd ${scratch}, 5 min limit)` })
-    const { stdout, stderr } = await execFileAsync(source, ['--appimage-extract'], { cwd: scratch, env, timeout: 5 * 60_000, maxBuffer: 64 * 1024 * 1024 })
-    log.debug(`Unpacked in ${since()}`, { detail: `${stdout.length + stderr.length} bytes of output${stderr.trim() ? `\n${stderr.trim().slice(-2000)}` : ''}` })
-
-    const unpacked = path.join(scratch, 'squashfs-root')
-    if (!(await isFile(path.join(unpacked, 'AppRun')))) {
-      log.fail('The AppImage unpacked without an AppRun launcher', new Error(`no AppRun in ${unpacked}`))
-      return { ok: false, message: 'The AppImage unpacked without an AppRun launcher.', path: target }
-    }
-    await fs.chmod(path.join(unpacked, 'AppRun'), 0o755)
+    const unpacked = await unpack(source, scratch)
     log.debug(`Moving the new install into place: ${unpacked} → ${target}`)
     await fs.rename(unpacked, target)
   } catch (e) {
@@ -202,6 +203,49 @@ export async function install(): Promise<{ ok: boolean; message: string; path: s
   }
   log.info(`Installed to ${target} in ${since()}`)
   return { ok: true, message: `Installed to ${target}.`, path: target }
+}
+
+// Unpack `source` into a fresh `scratch` folder and return the tree, with its AppRun executable.
+async function unpack(source: string, scratch: string): Promise<string> {
+  await ensureDir(scratch)
+  // ELECTRON_RUN_AS_NODE must not reach the child: the AppImage would start as Node and sit there
+  // instead of unpacking, and the install would hang until the timeout.
+  const env = { ...process.env }
+  delete env['ELECTRON_RUN_AS_NODE']
+  const started = Date.now()
+  log.info('Unpacking the AppImage – this takes a while', { detail: `${source} --appimage-extract (cwd ${scratch}, 5 min limit)` })
+  const { stdout, stderr } = await execFileAsync(source, ['--appimage-extract'], { cwd: scratch, env, timeout: 5 * 60_000, maxBuffer: 64 * 1024 * 1024 })
+  log.debug(`Unpacked in ${Date.now() - started} ms`, { detail: `${stdout.length + stderr.length} bytes of output${stderr.trim() ? `\n${stderr.trim().slice(-2000)}` : ''}` })
+  const unpacked = path.join(scratch, 'squashfs-root')
+  if (!(await isFile(path.join(unpacked, 'AppRun')))) throw new Error(`The AppImage unpacked without an AppRun launcher (no AppRun in ${unpacked}).`)
+  await fs.chmod(path.join(unpacked, 'AppRun'), 0o755)
+  return unpacked
+}
+
+// Put `next` at `target`. The old tree is only renamed aside (we may be running from it – its files stay readable)
+// and swept on the next start; it comes back when the rename fails.
+export async function swapIn(next: string, target: string): Promise<void> {
+  const doomed = `${target}.deleting-${process.pid}`
+  if (await exists(target)) await fs.rename(target, doomed)
+  try {
+    await fs.rename(next, target)
+  } catch (e) {
+    await fs.rename(doomed, target).catch(() => undefined)
+    throw e
+  }
+}
+
+// Unpack `source` over the install at `target` and return its launcher.
+export async function replaceInstall(source: string, target: string): Promise<string> {
+  const scratch = scratchFor(target)
+  await removeInstall(scratch)
+  try {
+    await swapIn(await unpack(source, scratch), target)
+  } finally {
+    await removeInstall(scratch).catch((e) => log.warn(`Could not remove ${scratch}`, { detail: errorMessage(e) }))
+  }
+  log.info(`Replaced ${target}`)
+  return path.join(target, 'AppRun')
 }
 
 // Desktop entry + icons

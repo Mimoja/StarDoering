@@ -19,7 +19,7 @@ const cache = new Map<string, { at: number; release: GithubRelease }>()
 const HEADERS = { 'User-Agent': 'StarDoring', Accept: 'application/vnd.github+json' }
 
 // GitHub's unauthenticated quota is 60/hour per IP – say so plainly instead of surfacing a bare HTTP code.
-function describeHttpError(repo: string, res: Response): Error {
+export function describeHttpError(repo: string, res: Response): Error {
   const reset = Number(res.headers.get('x-ratelimit-reset'))
   if (res.status === 403 && res.headers.get('x-ratelimit-remaining') === '0') {
     const until = reset ? ` It resets at ${new Date(reset * 1000).toLocaleTimeString()}.` : ''
@@ -69,7 +69,7 @@ export async function fetchLatestGithubRelease(repoInput: string): Promise<Githu
   return release
 }
 
-function fmtBytes(n: number): string {
+export function fmtBytes(n: number): string {
   return n < 1048576 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1048576).toFixed(1)} MB`
 }
 
