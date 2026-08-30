@@ -466,6 +466,15 @@ export interface ServerConfigPushResult {
   details: string[]
 }
 
+// Mods folder changes noticed while the app runs
+
+export interface ModsChangeEvent {
+  // Mod folders (relative to Mods/) whose config.json changed, appeared or vanished.
+  configs: string[]
+  // Mod folders that appeared or vanished.
+  folders: string[]
+}
+
 // SMAPI log viewer
 
 export interface SmapiLog {

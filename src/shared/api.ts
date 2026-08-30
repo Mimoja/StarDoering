@@ -1,4 +1,5 @@
 import type {
+  ModsChangeEvent,
   AppImageStatus,
   AppSettings,
   BranchInfo,
@@ -55,6 +56,8 @@ export interface Api {
     open(folder: string): Promise<void>
     remove(folder: string): Promise<void>
     install(zipPaths?: string[]): Promise<ModInstallResult>
+    // The game (GMCM) saved a config.json, a mod folder appeared or vanished – re-read whatever shows mods or their settings.
+    onChange(cb: (e: ModsChangeEvent) => void): Unsubscribe
   }
   saves: {
     list(): Promise<SaveInfo[]>

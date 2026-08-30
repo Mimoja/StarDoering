@@ -1,7 +1,7 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, safeStorage, shell } from 'electron'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
-import type { GithubInstallProgress, GithubInstallRequest, AppSettings, CatalogStatus, DeepLinkEvent, LaunchMode, LogEntry, ModConfigEdit, RemoteConfig, ServerConfigPullEvent, SmapiLog, SyncProgress, SyncState } from '../shared/types'
+import type { GithubInstallProgress, GithubInstallRequest, AppSettings, CatalogStatus, DeepLinkEvent, LaunchMode, LogEntry, ModConfigEdit, ModsChangeEvent, RemoteConfig, ServerConfigPullEvent, SmapiLog, SyncProgress, SyncState } from '../shared/types'
 import { GameService } from './game'
 import { ModlistService } from './modlist/service'
 import { ServerConfigService } from './server-config'
@@ -11,6 +11,7 @@ import { fetchLatestGithubRelease, installFromGithub } from './github'
 import { activityLog, logScope } from './activity'
 import { LogService } from './logs'
 import { SmapiLogFeed } from './smapi-feed'
+import { ModsWatcher } from './mods-watch'
 import { openTerminalAt } from './terminal'
 import { launchTarget, SteamShortcutService } from './steam-shortcut'
 import * as appimage from './appimage'
@@ -93,12 +94,15 @@ activityLog.onEntries((entries: LogEntry[]) => broadcast('activity:entries', ent
 const logs = new LogService({ logPath: async () => smapiLogPath((await game.getInfo()).dataDir), emit: (log: SmapiLog) => broadcast('logs:change', log) })
 // Its own watcher, so the renderer opening/closing the SMAPI log view cannot switch the feed off.
 const smapiFeed = new SmapiLogFeed({ logPath: async () => smapiLogPath((await game.getInfo()).dataDir) })
+// The game saving a config.json (GMCM), mod folders coming or going.
+const modsWatcher = new ModsWatcher({ modsDir: async () => (await game.getInfo()).modsDir, emit: (e: ModsChangeEvent) => broadcast('mods:change', e) })
 const catalog = new CatalogService({ userData, emit: (st: CatalogStatus) => broadcast('catalog:status', st) })
 const library = new ModLibrary({ userData })
 const steamShortcut = new SteamShortcutService(launchTarget({ isPackaged: app.isPackaged, execPath: process.execPath, appPath: app.getAppPath(), appImage: appimage.steamExecPath() }))
 const serverConfig = new ServerConfigService({ groups, modlist, game, settings: settingsStore, userData, catalog, emit: (p: SyncProgress) => broadcast('sync:progress', p), emitState: (st: SyncState) => broadcast('sync:state', st), emitPull: (e: ServerConfigPullEvent) => broadcast('serverConfig:pull', e), trash: (p: string) => shell.trashItem(p), library })
 
 game.on('exit', (info) => broadcast('game:exit', info))
+game.on('info', () => void modsWatcher.sync()) // the Mods folder follows game detection
 
 // The activity log in a window of its own (one at a time; a second call focuses it).
 function openActivityWindow(): void {
