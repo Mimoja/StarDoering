@@ -126,7 +126,7 @@ const RM = { recursive: true, force: true, maxRetries: 10, retryDelay: 50 } as c
  */
 async function removeInstall(dir: string): Promise<void> {
   if (!(await exists(dir))) return
-  const doomed = `${dir}.deleting-${process.pid}`
+  const doomed = `${dir}.deleting-${process.pid}-${Date.now()}`
   try {
     await fs.rename(dir, doomed)
   } catch (e) {
@@ -134,7 +134,9 @@ async function removeInstall(dir: string): Promise<void> {
     await fs.rm(dir, RM)
     return
   }
-  await fs.rm(doomed, RM).catch((e) => log.warn(`Left ${doomed} behind – it can be deleted by hand`, { detail: errorMessage(e) }))
+  // The rename freed the path; deleting a tree this size can take minutes (and once hung an install for good),
+  // so it happens in the background – whatever is left is swept at the next start, or by hand.
+  void fs.rm(doomed, RM).catch((e) => log.warn(`Left ${doomed} behind – it can be deleted by hand`, { detail: errorMessage(e) }))
 }
 
 // Remove the `<dir>.deleting-<pid>` trees an earlier install or update renamed aside – never the one we run from.
@@ -145,7 +147,8 @@ export async function sweepDoomed(dir: string): Promise<void> {
     if (!name.startsWith(prefix)) continue
     const doomed = path.join(parent, name)
     if (inside(process.execPath, doomed)) continue
-    await fs.rm(doomed, RM).catch(() => undefined)
+    // Fire and forget: a slow or stuck delete must never hold up the start (it used to block it forever).
+    void fs.rm(doomed, RM).catch(() => undefined)
   }
 }
 
@@ -225,7 +228,7 @@ async function unpack(source: string, scratch: string): Promise<string> {
 // Put `next` at `target`. The old tree is only renamed aside (we may be running from it – its files stay readable)
 // and swept on the next start; it comes back when the rename fails.
 export async function swapIn(next: string, target: string): Promise<void> {
-  const doomed = `${target}.deleting-${process.pid}`
+  const doomed = `${target}.deleting-${process.pid}-${Date.now()}`
   if (await exists(target)) await fs.rename(target, doomed)
   try {
     await fs.rename(next, target)
