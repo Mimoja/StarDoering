@@ -693,11 +693,15 @@ function NoteInput({ row, onSaved, notify }: { row: ServerConfigRow; onSaved: ()
 
 function LocalMods({ notify, cog }: { notify: (m: string) => void; cog: ReactNode }) {
   const mods = useAsync(() => api.mods.list())
-  // A mod folder dropped into Mods/ by hand is picked up whenever the window regains focus.
+  // A mod folder dropped into Mods/ by hand is picked up on window focus and when the watcher reports it.
   useEffect(() => {
-    const onFocus = (): void => void mods.reload()
-    window.addEventListener('focus', onFocus)
-    return () => window.removeEventListener('focus', onFocus)
+    const reload = (): void => void mods.reload()
+    window.addEventListener('focus', reload)
+    const offChange = api.mods.onChange(reload)
+    return () => {
+      window.removeEventListener('focus', reload)
+      offChange()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   // Every version this computer has ever downloaded – how a mod comes back after a profile switch
