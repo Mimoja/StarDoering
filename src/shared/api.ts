@@ -33,7 +33,8 @@ import type {
   SyncCommit,
   SyncGroup,
   SyncProgress,
-  SyncState
+  SyncState,
+  UpdateState
 } from './types'
 
 export type Unsubscribe = () => void
@@ -183,6 +184,12 @@ export interface Api {
     install(): Promise<{ ok: boolean; message: string; path: string }>
     // Write the .desktop entry and icons that put it in the application menu.
     installDesktop(): Promise<{ ok: boolean; message: string; path: string }>
+  }
+  // StarDöring's own updates: a newer GitHub release of Mimoja/StarDoering is installed at start and the app restarts into it.
+  update: {
+    // What is going on, for the Dashboard row and the toasts.
+    state(): Promise<UpdateState>
+    onState(cb: (s: UpdateState) => void): Unsubscribe
   }
   settings: {
     get(): Promise<AppSettings>

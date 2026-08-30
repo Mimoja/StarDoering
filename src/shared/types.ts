@@ -658,3 +658,34 @@ export interface GithubInstallProgress {
   version: string | null
   installed: string[]
 }
+
+// Self-update from the GitHub releases of StarDöring itself
+
+// How this copy is replaced: the AppImage file, the unpacked AppImage install, the NSIS installer, the portable exe,
+// the macOS bundle – or not at all: a deb needs root and is only announced, a dev run has no release.
+export type UpdateMethod = 'appimage' | 'unpacked' | 'deb' | 'nsis' | 'portable' | 'mac' | 'none'
+
+export interface UpdateAsset {
+  name: string
+  url: string
+  size: number | null
+}
+
+export interface UpdateState {
+  // idle = not checked yet (or the check failed); available = found but not installed on its own (`message` says why).
+  phase: 'idle' | 'current' | 'available' | 'downloading' | 'installing' | 'restarting' | 'error'
+  currentVersion: string
+  latestVersion: string | null
+  // The release page on GitHub.
+  releaseUrl: string
+  // The release file for this computer, null when the release has none for it.
+  asset: UpdateAsset | null
+  method: UpdateMethod
+  // True while the start-up updater holds the window; the app view renders once it is false.
+  gate: boolean
+  // Download progress in bytes (total is null without a Content-Length).
+  received: number
+  total: number | null
+  message: string
+  checkedAt: number | null
+}

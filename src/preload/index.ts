@@ -104,6 +104,10 @@ const api: Api = {
     install: () => invoke('appimage:install'),
     installDesktop: () => invoke('appimage:installDesktop')
   },
+  update: {
+    state: () => invoke('update:state'),
+    onState: (cb) => on('update:state', cb)
+  },
   settings: {
     get: () => invoke('settings:get'),
     set: (patch) => invoke('settings:set', patch)

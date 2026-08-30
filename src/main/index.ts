@@ -1,6 +1,6 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, safeStorage, shell } from 'electron'
 import path from 'node:path'
-import type { GithubInstallProgress, GithubInstallRequest, AppSettings, CatalogStatus, DeepLinkEvent, LaunchMode, LogEntry, ModConfigEdit, ModsChangeEvent, RemoteConfig, ServerConfigPullEvent, SmapiLog, SyncProgress, SyncState } from '../shared/types'
+import type { GithubInstallProgress, GithubInstallRequest, AppSettings, CatalogStatus, DeepLinkEvent, LaunchMode, LogEntry, ModConfigEdit, ModsChangeEvent, RemoteConfig, ServerConfigPullEvent, SmapiLog, SyncProgress, SyncState, UpdateState } from '../shared/types'
 import { GameService } from './game'
 import { ModlistService } from './modlist/service'
 import { ServerConfigService } from './server-config'
@@ -15,6 +15,7 @@ import { openTerminalAt } from './terminal'
 import { launchTarget, SteamShortcutService } from './steam-shortcut'
 import * as appimage from './appimage'
 import { relaunchInto } from './relaunch'
+import { UpdateService } from './updater'
 import { ensureGalaxyLibsLoadable } from './galaxy-fix'
 import { smapiLogPath } from './paths'
 import { installModZips, scanMods, setModEnabled } from './mods'
@@ -100,6 +101,17 @@ const catalog = new CatalogService({ userData, emit: (st: CatalogStatus) => broa
 const library = new ModLibrary({ userData })
 const steamShortcut = new SteamShortcutService(launchTarget({ isPackaged: app.isPackaged, execPath: process.execPath, appPath: app.getAppPath(), appImage: appimage.steamExecPath() }))
 const serverConfig = new ServerConfigService({ groups, modlist, game, settings: settingsStore, userData, catalog, emit: (p: SyncProgress) => broadcast('sync:progress', p), emitState: (st: SyncState) => broadcast('sync:state', st), emitPull: (e: ServerConfigPullEvent) => broadcast('serverConfig:pull', e), trash: (p: string) => shell.trashItem(p), library })
+
+// StarDöring's own updates: a newer GitHub release is installed at start and the app restarts into it.
+const updater = new UpdateService({
+  repo: 'Mimoja/StarDoering',
+  currentVersion: app.getVersion(),
+  isPackaged: app.isPackaged,
+  execPath: process.execPath,
+  tempDir,
+  attemptFile: path.join(userData, 'update-attempt.json'),
+  emit: (s: UpdateState) => broadcast('update:state', s)
+})
 
 game.on('exit', (info) => broadcast('game:exit', info))
 game.on('info', () => void modsWatcher.sync()) // the Mods folder follows game detection
@@ -416,6 +428,9 @@ function registerIpc(): void {
   })
   handle('appimage:installDesktop', () => appimage.installDesktopFiles())
 
+  // self-update (automatic at start – the renderer only watches)
+  handle('update:state', () => updater.getState())
+
   // settings
   handle('settings:get', () => settingsStore.get())
   handle('settings:set', async (patch: Partial<AppSettings>) => {
@@ -498,6 +513,11 @@ if (!app.requestSingleInstanceLock()) {
     registerIpc()
     registerProtocolClient()
     createWindow()
+    // A newer release is installed before the app view renders; a link arriving meanwhile stays queued until then.
+    if ((await updater.runAtStart()) === 'restarting') return
+    // Leave the outcome on screen for a moment – long enough to read a failure.
+    await new Promise((r) => setTimeout(r, updater.getState().phase === 'error' ? 2500 : 1000))
+    updater.releaseView()
     // Launched by a link: it is sitting in our own argv (Windows/Linux; macOS used open-url above).
     const startupLink = deepLinkFromArgv(process.argv)
     if (startupLink) handleDeepLink(startupLink)
@@ -509,6 +529,7 @@ if (!app.requestSingleInstanceLock()) {
     // versions this computer is running right now.
     void game.getInfo().then((i) => (i.modsDir ? library.capture(i.modsDir) : [])).catch(() => [])
     void smapiFeed.start() // merge SMAPI's log into the activity log
+    updater.startPolling() // later checks only keep the Dashboard row honest
     app.on('activate', () => {
       if (!mainWindow || mainWindow.isDestroyed()) createWindow()
     })
